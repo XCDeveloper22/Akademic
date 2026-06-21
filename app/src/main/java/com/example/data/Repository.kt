@@ -51,4 +51,19 @@ class AcademicRepository(private val dao: AcademicDao) {
     suspend fun deleteScheduleById(id: Int) {
         dao.deleteScheduleItemById(id)
     }
+
+    // Tasks
+    val allTasks: Flow<List<Task>> = dao.getAllTasks()
+
+    suspend fun insertTask(task: Task): Long {
+        return dao.insertTask(task)
+    }
+
+    suspend fun deleteTask(task: Task) {
+        dao.deleteTask(task)
+    }
+
+    suspend fun deleteTaskById(id: Int) {
+        dao.deleteTaskById(id)
+    }
 }

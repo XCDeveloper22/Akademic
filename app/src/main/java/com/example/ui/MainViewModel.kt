@@ -16,7 +16,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val db = Room.databaseBuilder(
         application,
         AppDatabase::class.java, "akademic_db"
-    ).build()
+    ).fallbackToDestructiveMigration().build()
 
     private val repository = AcademicRepository(db.academicDao())
 
@@ -26,6 +26,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // Data streams
     val semesters: StateFlow<List<Semester>> = repository.allSemesters
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    val tasks: StateFlow<List<Task>> = repository.allTasks
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -52,6 +59,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             semesters.collect { list ->
                 if (selectedSemesterId.value == null && list.isNotEmpty()) {
                     selectedSemesterId.value = list.firstOrNull()?.id
+                }
+            }
+        }
+
+        // Collect scheduleItems and dynamically reschedule alarms whenever they change
+        viewModelScope.launch {
+            scheduleItems.collect { items ->
+                try {
+                    com.example.notification.AlarmScheduler.rescheduleAllAlarms(getApplication(), items)
+                } catch (e: Exception) {
+                    android.util.Log.e("MainViewModel", "Failed to reschedule alarms: ${e.message}")
                 }
             }
         }
@@ -127,11 +145,51 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun updateSemester(id: Int, name: String) {
+        viewModelScope.launch {
+            repository.insertSemester(Semester(id = id, name = name))
+        }
+    }
+
+    fun updateCourse(id: Int, semesterId: Int, code: String, name: String, credits: Double, gradeString: String) {
+        val gradePoints = getPointsForGrade(gradeString)
+        viewModelScope.launch {
+            repository.insertCourse(
+                Course(
+                    id = id,
+                    semesterId = semesterId,
+                    code = code,
+                    name = name,
+                    credits = credits,
+                    gradeString = gradeString,
+                    gradePoints = gradePoints
+                )
+            )
+        }
+    }
+
     // Schedule Actions
     fun addScheduleItem(title: String, code: String, dayOfWeek: String, startTime: String, endTime: String, room: String, colorHex: String) {
         viewModelScope.launch {
             repository.insertSchedule(
                 ScheduleItem(
+                    title = title,
+                    code = code,
+                    dayOfWeek = dayOfWeek,
+                    startTime = startTime,
+                    endTime = endTime,
+                    room = room,
+                    colorHex = colorHex
+                )
+            )
+        }
+    }
+
+    fun updateScheduleItem(id: Int, title: String, code: String, dayOfWeek: String, startTime: String, endTime: String, room: String, colorHex: String) {
+        viewModelScope.launch {
+            repository.insertSchedule(
+                ScheduleItem(
+                    id = id,
                     title = title,
                     code = code,
                     dayOfWeek = dayOfWeek,
@@ -173,4 +231,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         "1.00", "1.25", "1.50", "1.75", "2.00", "2.25", "2.50", "2.75", "3.00", "5.00",
         "INC", "IP", "DRP", "ODP", "W", "WP"
     )
+
+    fun addTask(task: Task, context: android.content.Context) {
+        viewModelScope.launch {
+            val newlyCreatedId = repository.insertTask(task)
+            val fullTaskObject = task.copy(id = newlyCreatedId.toInt())
+            if (fullTaskObject.isReminderEnabled) {
+                com.example.notification.TaskAlarmScheduler.scheduleTaskReminder(context, fullTaskObject)
+            }
+        }
+    }
+
+    fun updateTask(task: Task, context: android.content.Context) {
+        viewModelScope.launch {
+            repository.insertTask(task)
+            if (task.isReminderEnabled) {
+                com.example.notification.TaskAlarmScheduler.scheduleTaskReminder(context, task)
+            } else {
+                com.example.notification.TaskAlarmScheduler.cancelTaskReminder(context, task)
+            }
+        }
+    }
+
+    fun deleteTask(task: Task, context: android.content.Context) {
+        viewModelScope.launch {
+            repository.deleteTask(task)
+            com.example.notification.TaskAlarmScheduler.cancelTaskReminder(context, task)
+        }
+    }
 }

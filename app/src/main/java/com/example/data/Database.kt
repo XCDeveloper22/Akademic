@@ -86,9 +86,34 @@ interface AcademicDao {
 
     @Query("DELETE FROM schedule_items WHERE id = :id")
     suspend fun deleteScheduleItemById(id: Int)
+
+    // Tasks queries
+    @Query("SELECT * FROM tasks ORDER BY id DESC")
+    fun getAllTasks(): Flow<List<Task>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTask(task: Task): Long
+
+    @Delete
+    suspend fun deleteTask(task: Task)
+
+    @Query("DELETE FROM tasks WHERE id = :id")
+    suspend fun deleteTaskById(id: Int)
 }
 
-@Database(entities = [Semester::class, Course::class, ScheduleItem::class], version = 1, exportSchema = false)
+@Entity(tableName = "tasks")
+data class Task(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val title: String,
+    val description: String = "",
+    val isCompleted: Boolean = false,
+    val isReminderEnabled: Boolean = false,
+    val reminderTime: String = "12:00", // "HH:mm" 
+    val reminderDayOfWeek: String = "Daily", // "Daily", "Monday", "Tuesday", etc.
+    val isDaily: Boolean = true
+)
+
+@Database(entities = [Semester::class, Course::class, ScheduleItem::class, Task::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun academicDao(): AcademicDao
 }
