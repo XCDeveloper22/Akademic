@@ -1,0 +1,6 @@
+{
+  "name": "Akademic",
+  "description": "An offline academic portal, scheduling planner, and GPA tracker with a clean Bento Grid layout, beautiful red-gold theme, and custom schedule share capability.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
