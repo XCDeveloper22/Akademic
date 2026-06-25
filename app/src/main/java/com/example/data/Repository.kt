@@ -66,4 +66,15 @@ class AcademicRepository(private val dao: AcademicDao) {
     suspend fun deleteTaskById(id: Int) {
         dao.deleteTaskById(id)
     }
+
+    // Journal
+    val allJournalEntries: Flow<List<JournalEntry>> = dao.getAllJournalEntries()
+
+    suspend fun insertJournalEntry(entry: JournalEntry): Long {
+        return dao.insertJournalEntry(entry)
+    }
+
+    suspend fun deleteJournalEntryById(id: Int) {
+        dao.deleteJournalEntryById(id)
+    }
 }

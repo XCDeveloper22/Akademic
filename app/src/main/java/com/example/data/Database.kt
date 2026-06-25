@@ -99,6 +99,16 @@ interface AcademicDao {
 
     @Query("DELETE FROM tasks WHERE id = :id")
     suspend fun deleteTaskById(id: Int)
+
+    // Journal Queries
+    @Query("SELECT * FROM journal_entries ORDER BY timestamp DESC")
+    fun getAllJournalEntries(): Flow<List<JournalEntry>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertJournalEntry(entry: JournalEntry): Long
+
+    @Query("DELETE FROM journal_entries WHERE id = :id")
+    suspend fun deleteJournalEntryById(id: Int)
 }
 
 @Entity(tableName = "tasks")
@@ -113,7 +123,17 @@ data class Task(
     val isDaily: Boolean = true
 )
 
-@Database(entities = [Semester::class, Course::class, ScheduleItem::class, Task::class], version = 2, exportSchema = false)
+@Entity(tableName = "journal_entries")
+data class JournalEntry(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val title: String,
+    val content: String,
+    val dateString: String, // "yyyy-MM-dd"
+    val timestamp: Long = System.currentTimeMillis(),
+    val mood: String = "Neutral"
+)
+
+@Database(entities = [Semester::class, Course::class, ScheduleItem::class, Task::class, JournalEntry::class], version = 3, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun academicDao(): AcademicDao
 }

@@ -19,6 +19,18 @@ class BootReceiver : BroadcastReceiver() {
             intent.action == "android.intent.action.QUICKBOOT_POWERON") {
             Log.d(TAG, "Device rebooted. Rescheduling all academic class reminders.")
             
+            // Auto-restart Assistive Touch service if enabled prior to shut down
+            val touchPrefs = context.getSharedPreferences("akademic_assistive_touch_prefs", Context.MODE_PRIVATE)
+            val isEnabled = touchPrefs.getBoolean("is_service_running", false)
+            if (isEnabled && android.provider.Settings.canDrawOverlays(context)) {
+                val serviceIntent = Intent(context, com.example.FloatingService::class.java)
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    context.startForegroundService(serviceIntent)
+                } else {
+                    context.startService(serviceIntent)
+                }
+            }
+
             val pendingResult = goAsync()
             CoroutineScope(Dispatchers.IO).launch {
                 try {
@@ -36,6 +48,7 @@ class BootReceiver : BroadcastReceiver() {
                             TaskAlarmScheduler.scheduleTaskReminder(context, task)
                         }
                     }
+                    com.example.notification.AkiAlarmScheduler.scheduleNextAkiWakeup(context)
                     db.close()
                     Log.d(TAG, "Successfully restored ${schedules.size} class alarms and active task reminders on boot.")
                 } catch (e: Exception) {

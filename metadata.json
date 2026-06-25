@@ -1,19 +1,9 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
-   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
--->
-<data-extraction-rules>
-    <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
-    </cloud-backup>
-    <!--
-    <device-transfer>
-        <include .../>
-        <exclude .../>
-    </device-transfer>
-    -->
-</data-extraction-rules>
+{
+  "name": "AKADEMIC app",
+  "icon": "app/src/main/res/drawable/akademic_app_icon_1782210443308.jpg",
+  "description": "An offline academic portal, scheduling planner, and GPA tracker with a clean Bento Grid layout, beautiful red-gold theme, and custom schedule share capability.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

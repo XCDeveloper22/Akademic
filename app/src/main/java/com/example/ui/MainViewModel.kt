@@ -53,6 +53,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             initialValue = emptyList()
         )
 
+    val journalEntries: StateFlow<List<JournalEntry>> = repository.allJournalEntries
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
     init {
         // Collect semesters to set the initial selected semester ID when the list is populated by the user
         viewModelScope.launch {
@@ -70,6 +77,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     com.example.notification.AlarmScheduler.rescheduleAllAlarms(getApplication(), items)
                 } catch (e: Exception) {
                     android.util.Log.e("MainViewModel", "Failed to reschedule alarms: ${e.message}")
+                }
+            }
+        }
+
+        // Collect journalEntries and dynamically sync streak to shared preferences for the FloatingService/MochiTouchView
+        viewModelScope.launch {
+            journalEntries.collect { entries ->
+                try {
+                    val streak = calculateJournalStreak(entries)
+                    val touchPrefs = getApplication<Application>().getSharedPreferences("akademic_assistive_touch_prefs", android.content.Context.MODE_PRIVATE)
+                    touchPrefs.edit().putInt("journal_streak", streak).apply()
+                } catch (e: Exception) {
+                    android.util.Log.e("MainViewModel", "Failed to sync streak to SharedPreferences", e)
                 }
             }
         }
@@ -257,6 +277,118 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             repository.deleteTask(task)
             com.example.notification.TaskAlarmScheduler.cancelTaskReminder(context, task)
+        }
+    }
+
+    // Journal actions
+    fun addJournalEntry(title: String, content: String, dateString: String, mood: String) {
+        viewModelScope.launch {
+            val prefs = getApplication<Application>().getSharedPreferences("akademic_timezone_prefs", android.content.Context.MODE_PRIVATE)
+            val zoneIdStr = prefs.getString("selected_zone", "Asia/Manila") ?: "Asia/Manila"
+            val zoneId = try { java.time.ZoneId.of(zoneIdStr) } catch (e: Exception) { java.time.ZoneId.systemDefault() }
+            val resolvedDate = java.time.ZonedDateTime.now(zoneId).toLocalDate().toString()
+            repository.insertJournalEntry(
+                JournalEntry(
+                    title = title,
+                    content = content,
+                    dateString = resolvedDate,
+                    mood = mood,
+                    timestamp = System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    fun updateJournalEntry(id: Int, title: String, content: String, dateString: String, mood: String) {
+        viewModelScope.launch {
+            repository.insertJournalEntry(
+                JournalEntry(
+                    id = id,
+                    title = title,
+                    content = content,
+                    dateString = dateString,
+                    mood = mood
+                )
+            )
+        }
+    }
+
+    fun deleteJournalEntry(id: Int) {
+        viewModelScope.launch {
+            repository.deleteJournalEntryById(id)
+        }
+    }
+
+    fun calculateJournalStreak(entries: List<JournalEntry>): Int {
+        if (entries.isEmpty()) {
+            try {
+                val touchPrefs = getApplication<Application>().getSharedPreferences("akademic_assistive_touch_prefs", android.content.Context.MODE_PRIVATE)
+                touchPrefs.edit().putInt("journal_streak", 0).apply()
+            } catch (e: Exception) {}
+            return 0
+        }
+        try {
+            // Get selected timezone from preferences
+            val prefs = getApplication<Application>().getSharedPreferences("akademic_timezone_prefs", android.content.Context.MODE_PRIVATE)
+            val zoneIdStr = prefs.getString("selected_zone", "Asia/Manila") ?: "Asia/Manila"
+            val zoneId = try { java.time.ZoneId.of(zoneIdStr) } catch (e: Exception) { java.time.ZoneId.systemDefault() }
+            
+            val now = java.time.ZonedDateTime.now(zoneId)
+            val currentBlock = now.toLocalDate().toEpochDay() * 2 + (if (now.hour >= 12) 1 else 0)
+            
+            // Map each entry's timestamp to its corresponding 12-hour block
+            val entryBlocks = entries.map { entry ->
+                val entryTime = java.time.ZonedDateTime.ofInstant(java.time.Instant.ofEpochMilli(entry.timestamp), zoneId)
+                entryTime.toLocalDate().toEpochDay() * 2 + (if (entryTime.hour >= 12) 1 else 0)
+            }.toSet()
+            
+            // The streak is broken/expired if there is no entry in the current block AND no entry in the previous block
+            if (!entryBlocks.contains(currentBlock) && !entryBlocks.contains(currentBlock - 1)) {
+                try {
+                    val touchPrefs = getApplication<Application>().getSharedPreferences("akademic_assistive_touch_prefs", android.content.Context.MODE_PRIVATE)
+                    touchPrefs.edit().putInt("journal_streak", 0).apply()
+                } catch (ex: Exception) {}
+                return 0
+            }
+            
+            var streak = 0
+            var checkBlock = if (entryBlocks.contains(currentBlock)) currentBlock else currentBlock - 1
+            
+            while (entryBlocks.contains(checkBlock)) {
+                streak++
+                checkBlock--
+            }
+            try {
+                val touchPrefs = getApplication<Application>().getSharedPreferences("akademic_assistive_touch_prefs", android.content.Context.MODE_PRIVATE)
+                touchPrefs.edit().putInt("journal_streak", streak).apply()
+            } catch (ex: Exception) {}
+            return streak
+        } catch (e: Exception) {
+            android.util.Log.e("MainViewModel", "Streak calc failed", e)
+            try {
+                val touchPrefs = getApplication<Application>().getSharedPreferences("akademic_assistive_touch_prefs", android.content.Context.MODE_PRIVATE)
+                touchPrefs.edit().putInt("journal_streak", 0).apply()
+            } catch (ex: Exception) {}
+            return 0
+        }
+    }
+
+    fun isJournalWrittenToday(entries: List<JournalEntry>): Boolean {
+        try {
+            val prefs = getApplication<Application>().getSharedPreferences("akademic_timezone_prefs", android.content.Context.MODE_PRIVATE)
+            val zoneIdStr = prefs.getString("selected_zone", "Asia/Manila") ?: "Asia/Manila"
+            val zoneId = try { java.time.ZoneId.of(zoneIdStr) } catch (e: Exception) { java.time.ZoneId.systemDefault() }
+            
+            val now = java.time.ZonedDateTime.now(zoneId)
+            val currentBlock = now.toLocalDate().toEpochDay() * 2 + (if (now.hour >= 12) 1 else 0)
+            
+            return entries.any { entry ->
+                val entryTime = java.time.ZonedDateTime.ofInstant(java.time.Instant.ofEpochMilli(entry.timestamp), zoneId)
+                val entryBlock = entryTime.toLocalDate().toEpochDay() * 2 + (if (entryTime.hour >= 12) 1 else 0)
+                entryBlock == currentBlock
+            }
+        } catch (e: Exception) {
+            return false
         }
     }
 }

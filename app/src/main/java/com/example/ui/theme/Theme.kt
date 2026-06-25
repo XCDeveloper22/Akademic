@@ -8,15 +8,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 enum class AppTheme(val displayName: String, val isDark: Boolean) {
-    CLASSIC_LIGHT("Classic Light", false),
-    DARK_MODE("Dark Mode", true),
-    AKADEMIC_BLUE("Akademic Blue", true),
-    FOREST_GREEN("Forest Green", true),
-    SUNSET_ORANGE("Sunset Orange", true),
-    PURPLE_SCHOLAR("Purple Scholar", true),
-    PINK_BLOSSOM("Pink Blossom", false),
-    PINK_SCHOLAR("Pink Scholar", true),
-    MIDNIGHT_BLACK("Midnight Black", true)
+    DARK_MODE("Velvet Crimson", true),
+    AKADEMIC_BLUE("Celestial Sapphire", true),
+    FOREST_GREEN("Ethereal Emerald", true),
+    SUNSET_ORANGE("Saffron Aurora", true),
+    PURPLE_SCHOLAR("Mystic Amethyst", true),
+    PINK_SCHOLAR("Plum Velvet", true),
+    MIDNIGHT_BLACK("Stark Obsidian", true)
 }
 
 private val DarkColorScheme = darkColorScheme(
@@ -164,13 +162,11 @@ fun MyApplicationTheme(
     content: @Composable () -> Unit
 ) {
     val colorScheme = when (appTheme) {
-        AppTheme.CLASSIC_LIGHT -> LightColorScheme
         AppTheme.DARK_MODE -> DarkColorScheme
         AppTheme.AKADEMIC_BLUE -> AkademicBlueColorScheme
         AppTheme.FOREST_GREEN -> ForestGreenColorScheme
         AppTheme.SUNSET_ORANGE -> SunsetOrangeColorScheme
         AppTheme.PURPLE_SCHOLAR -> PurpleScholarColorScheme
-        AppTheme.PINK_BLOSSOM -> PinkBlossomColorScheme
         AppTheme.PINK_SCHOLAR -> PinkScholarColorScheme
         AppTheme.MIDNIGHT_BLACK -> MidnightBlackColorScheme
     }
